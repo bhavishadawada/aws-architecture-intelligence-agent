@@ -42,7 +42,7 @@ from cdklabs.generative_ai_cdk_constructs import (
 import json
 import datetime
 
-class WafrGenaiAcceleratorStack(Stack):
+class AWSArchitectureIntelligenceAgentStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, tags: dict = None, **kwargs) -> None:
         """

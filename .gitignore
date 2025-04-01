@@ -137,4 +137,6 @@ dist
 
 # Other files
 .DS_Store
-.venv/ 
+.venv/
+cdk.out
+cdk.context.json

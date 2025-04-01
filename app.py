@@ -2,7 +2,7 @@ import os
 
 import aws_cdk as cdk
 
-from wafr_genai_accelerator.wafr_genai_accelerator_stack import WafrGenaiAcceleratorStack
+from wafr_genai_accelerator.wafr_genai_accelerator_stack import AWSArchitectureIntelligenceAgentStack
 
 app = cdk.App()
 
@@ -18,7 +18,8 @@ tags = {
     "Project": "WellArchitectedReview"
 }
 
-WafrGenaiAcceleratorStack(app, "WellArchitectedReviewUsingGenAIStack", tags=tags,
+
+AWSArchitectureIntelligenceAgentStack(app, "AWSArchitectureIntelligenceAgentStack", tags=tags,
     # If you don't specify 'env', this stack will be environment-agnostic.
     # Account/Region-dependent features and context lookups will not work,
     # but a single synthesized template can be deployed anywhere.
