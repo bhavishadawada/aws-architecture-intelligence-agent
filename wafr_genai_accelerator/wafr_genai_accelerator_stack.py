@@ -25,8 +25,13 @@ from aws_cdk import (
     aws_stepfunctions as sfn,
     aws_stepfunctions_tasks as tasks,
     aws_lambda_event_sources as lambda_events,
-    aws_logs
+    aws_logs,
 )
+
+from aws_cdk import aws_s3_deployment as s3deploy
+from aws_cdk import Duration, Size
+from aws_cdk import aws_logs as logs
+
 import aws_cdk.aws_elasticloadbalancingv2_targets as elasticloadbalancingv2_targets
 
 from aws_cdk.aws_ssm import StringParameter
@@ -104,7 +109,11 @@ class AWSArchitectureIntelligenceAgentStack(Stack):
         #Uploading WAFR docs to the corresponding S3 bucket [wafrReferenceDocsBucket]
         wafrReferenceDeploy = s3deploy.BucketDeployment(self, "uploadwellarchitecteddocs",
             sources=[s3deploy.Source.asset('well_architected_docs')],
-            destination_bucket=wafrReferenceDocsBucket
+            destination_bucket=wafrReferenceDocsBucket,
+            memory_limit=2048,  # 2 GB of memory
+            ephemeral_storage_size=Size.gibibytes(2),
+            log_retention=logs.RetentionDays.ONE_WEEK,
+            prune=False  # Don't delete files in destination that don't exist in source
         )
         
         #S3 Bucket where customer design is stored
@@ -732,8 +741,11 @@ class AWSArchitectureIntelligenceAgentStack(Stack):
         #Uploading UI code to the corresponding S3 bucket [wafrReferenceDocsBucket]
         wafrUIBucketDeploy = s3deploy.BucketDeployment(self, "uploaduicode",
             sources=[s3deploy.Source.asset('ui_code')],
-            destination_bucket=wafrUIBucket
-        )
+            destination_bucket=wafrUIBucket,
+            memory_limit=2048,  # Increase to 2 GB
+            ephemeral_storage_size=Size.gibibytes(2)  # Add ephemeral storage
+            
+            )
                
         # Create an IAM role for the startWafrReviewFunctionRole Lambda function
         startWafrReviewFunctionRole = iam.Role(
@@ -907,6 +919,20 @@ class AWSArchitectureIntelligenceAgentStack(Stack):
                 "BEDROCK_MAX_TRIES" : "5"
             }
         )
+        generate_pricing_response = _lambda.Function(self, "generate_pricing_response",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            handler="generate_pricing_response.lambda_handler",
+            code=_lambda.Code.from_asset("lambda_dir/generate_pricing"),
+            timeout=cdk.Duration.minutes(15),
+            memory_size=256,
+            role = startWafrReviewFunctionRole,
+            reserved_concurrent_executions=1,
+            environment={
+                "BEDROCK_SLEEP_DURATION" : "60",
+                "BEDROCK_MAX_TRIES" : "5"
+            }
+        )
+
         update_review_status = _lambda.Function(self, "update_review_status",
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler="update_review_status.lambda_handler",
@@ -944,6 +970,8 @@ class AWSArchitectureIntelligenceAgentStack(Stack):
         generate_solution_summary.grant_invoke(step_function_role)
         generate_prompts.grant_invoke(step_function_role)
         generate_pillar_question_response.grant_invoke(step_function_role)
+        generate_pricing_response.grant_invoke(step_function_role)
+
         update_review_status.grant_invoke(step_function_role)
         
         # Define Step Function tasks
@@ -981,6 +1009,11 @@ class AWSArchitectureIntelligenceAgentStack(Stack):
         update_review_status_task = tasks.LambdaInvoke(
             self, "Mark review as complete",
             lambda_function=update_review_status,
+            output_path="$.Payload"
+        )
+        generate_pricing_response_task = tasks.LambdaInvoke(
+            self, "Generate pricing response",
+            lambda_function=generate_pricing_response,
             output_path="$.Payload"
         )
 
